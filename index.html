@@ -29,38 +29,39 @@
   <label>خطوة التردد Δf:</label>
   <input id="dfInput" type="number" value="1">
 
-  <h2>تحويل كلمة ↔ عدد لغوي ↔ تردد</h2>
-  <label>أدخل كلمة عربية:</label>
-  <textarea id="wordInput" placeholder="مثال: برهوم"></textarea>
-  <button onclick="encodeWord()">تحويل</button>
+  <h2>تحويل جملة إلى ترددات</h2>
+  <label>أدخل جملة عربية:</label>
+  <textarea id="sentenceInput" placeholder="مثال: السلام عليكم ورحمة الله وبركاته"></textarea>
+  <button onclick="encodeSentence()">تحويل</button>
+  <button onclick="copyAllFreqs()">نسخ جميع الترددات</button>
   <div class="output" id="encodeOutput">—</div>
 
-  <h2>تحويل عدد ↔ كلمة</h2>
-  <label>أدخل عدد عشري ضخم:</label>
-  <textarea id="bigIntInput"></textarea>
-  <button onclick="decodeBigInt()">تحويل</button>
+  <h2>تحويل ترددات إلى جملة</h2>
+  <label>أدخل الترددات (كل كلمة في سطر):</label>
+  <textarea id="freqListInput"></textarea>
+  <button onclick="decodeFreqList()">تحويل</button>
   <div class="output" id="decodeOutput">—</div>
 
   <div class="footer">م: برهوم — الإصدار الرسمي الأول للنظام</div>
 </div>
 
 <script>
-  // إعدادات الحروف
   const alphabet = ["ا","ب","ت","ث","ج","ح","خ","د","ذ","ر","ز","س","ش","ص","ض","ط","ظ","ع","غ","ف","ق","ك","ل","م","ن","ه","و","ي"];
   const base = 28**3; // أساس النظام (رمز = 3 حروف)
 
   // تحويل رمز (3 حروف) إلى رقم
   function symbolToNumber(sym){
+    if(sym.includes("#")) return 0; // رمز النهاية
     let [c1,c2,c3] = sym.split("");
     let i1 = alphabet.indexOf(c1)+1;
     let i2 = alphabet.indexOf(c2)+1;
     let i3 = alphabet.indexOf(c3)+1;
-    if(i1<0||i2<0||i3<0) throw new Error("حرف غير مدعوم");
     return i1*28*28 + i2*28 + i3;
   }
 
   // تحويل رقم إلى رمز (3 حروف)
   function numberToSymbol(num){
+    if(num===0) return "#";
     let i1 = Math.floor(num/(28*28));
     let rem = num%(28*28);
     let i2 = Math.floor(rem/28);
@@ -69,9 +70,7 @@
   }
 
   // إضافة رمز النهاية #
-  function addEndSymbol(word){
-    return word+"#";
-  }
+  function addEndSymbol(word){return word+"#";}
 
   // تقسيم الكلمة إلى رموز (3 حروف)
   function splitWord(word){
@@ -88,11 +87,7 @@
     let blocks=splitWord(word);
     let n=0n;
     for(let b of blocks){
-      if(b.includes("#")){ // رمز النهاية
-        n = n*BigInt(base) + BigInt(0);
-      }else{
-        n = n*BigInt(base) + BigInt(symbolToNumber(b));
-      }
+      n = n*BigInt(base) + BigInt(symbolToNumber(b));
     }
     return n;
   }
@@ -104,7 +99,7 @@
     while(n>0n){
       let r = n%BigInt(base);
       n = n/BigInt(base);
-      blocks.unshift(r==0n?"#":numberToSymbol(Number(r)));
+      blocks.unshift(numberToSymbol(Number(r)));
     }
     return blocks.join("");
   }
@@ -115,25 +110,54 @@
     return Number(f0)+Number(N)*Number(df);
   }
 
-  // واجهة المستخدم
-  function encodeWord(){
-    let word=document.getElementById("wordInput").value.trim();
-    let f0=document.getElementById("f0Input").value;
-    let df=document.getElementById("dfInput").value;
-    try{
-      let N=wordToBigInt(word);
-      let freq=wordToFreq(word,f0,df);
-      document.getElementById("encodeOutput").textContent=
-        "الكلمة: "+word+"\nBigInt: "+N+"\nالتردد: "+freq+" Hz";
-    }catch(e){document.getElementById("encodeOutput").textContent="خطأ: "+e.message;}
+  // تردد → كلمة
+  function freqToWord(freq,f0,df){
+    let C=Math.round((freq-f0)/df);
+    return bigIntToWord(C);
   }
 
-  function decodeBigInt(){
-    let str=document.getElementById("bigIntInput").value.trim();
-    try{
-      let word=bigIntToWord(str);
-      document.getElementById("decodeOutput").textContent="الكلمة: "+word;
-    }catch(e){document.getElementById("decodeOutput").textContent="خطأ: "+e.message;}
+  // واجهة المستخدم
+  function encodeSentence(){
+    let sentence=document.getElementById("sentenceInput").value.trim();
+    let f0=Number(document.getElementById("f0Input").value);
+    let df=Number(document.getElementById("dfInput").value);
+    let words=sentence.split(/\s+/);
+    let allFreqs=[];
+    let html="<table><tr><th>الكلمة</th><th>الرموز</th><th>BigInt</th><th>التردد</th></tr>";
+    words.forEach(word=>{
+      let N=wordToBigInt(word);
+      let freq=wordToFreq(word,f0,df);
+      allFreqs.push(freq);
+      html+=`<tr><td>${word}</td><td>${splitWord(word).join(" | ")}</td><td>${N}</td><td>${freq} Hz</td></tr>`;
+    });
+    html+="</table>";
+    document.getElementById("encodeOutput").innerHTML=html;
+    window.lastFreqList=allFreqs;
+  }
+
+  function copyAllFreqs(){
+    if(!window.lastFreqList) return;
+    navigator.clipboard.writeText(window.lastFreqList.join("\n"));
+  }
+
+  function decodeFreqList(){
+    let f0=Number(document.getElementById("f0Input").value);
+    let df=Number(document.getElementById("dfInput").value);
+    let input=document.getElementById("freqListInput").value.trim();
+    let lines=input.split(/\n+/);
+    let words=[];
+    lines.forEach(line=>{
+      let parts=line.trim().split(/\s+/);
+      let blocks=[];
+      parts.forEach(p=>{
+        let freq=Number(p);
+        if(isNaN(freq)) return;
+        let word=freqToWord(freq,f0,df);
+        blocks.push(word);
+      });
+      if(blocks.length>0) words.push(blocks.join(" "));
+    });
+    document.getElementById("decodeOutput").textContent=words.join(" ");
   }
 </script>
 </body>
