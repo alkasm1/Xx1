@@ -31,7 +31,7 @@
 
   <h2>تحويل جملة إلى ترددات</h2>
   <label>أدخل جملة عربية:</label>
-  <textarea id="sentenceInput" placeholder="مثال: السلام عليكم ورحمة الله وبركاته"></textarea>
+  <textarea id="sentenceInput" placeholder="مثال: برهوم عربي سلام"></textarea>
   <button onclick="encodeSentence()">تحويل</button>
   <button onclick="copyAllFreqs()">نسخ جميع الترددات</button>
   <div class="output" id="encodeOutput">—</div>
@@ -42,10 +42,11 @@
   <button onclick="decodeFreqList()">تحويل</button>
   <div class="output" id="decodeOutput">—</div>
 
-  <div class="footer">م: برهوم — الإصدار الرسمي الأول للنظام</div>
+  <div class="footer">م: برهوم — الإصدار الرسمي المطوّر</div>
 </div>
 
 <script>
+  // الحروف الرسمية AR28
   const alphabet = ["ا","ب","ت","ث","ج","ح","خ","د","ذ","ر","ز","س","ش","ص","ض","ط","ظ","ع","غ","ف","ق","ك","ل","م","ن","ه","و","ي"];
   const base = 28**3; // أساس النظام (رمز = 3 حروف)
 
