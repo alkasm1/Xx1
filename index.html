@@ -2,82 +2,138 @@
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8">
-  <title>النظام الترددي اللغوي — ضغط RLE</title>
+  <title>النظام الرسمي BRHM-LNS</title>
   <style>
     body {font-family:"Cairo",sans-serif;background:#0d1117;color:#e6edf3;margin:0;padding:0;}
-    .container {max-width:900px;margin:40px auto;background:#161b22;border-radius:14px;padding:28px;border:1px solid #30363d;box-shadow:0 0 40px rgba(0,0,0,0.4);}
-    h1 {text-align:center;color:#58a6ff;margin-bottom:20px;font-size:2rem;}
+    .container {max-width:1000px;margin:40px auto;background:#161b22;border-radius:14px;padding:28px;border:1px solid #30363d;}
+    h1 {text-align:center;color:#58a6ff;margin-bottom:20px;}
     h2 {color:#79c0ff;margin-bottom:10px;}
-    textarea,input {width:100%;padding:10px;margin-top:6px;border-radius:8px;border:1px solid #30363d;background:#0d1117;color:#e6edf3;font-size:1rem;}
-    button {margin-top:12px;padding:10px 18px;border-radius:8px;border:none;background:#238636;color:white;font-size:0.95rem;cursor:pointer;transition:0.2s;}
+    label {margin-top:10px;display:block;}
+    textarea,input {width:100%;padding:10px;margin-top:6px;border-radius:8px;border:1px solid #30363d;background:#0d1117;color:#e6edf3;}
+    button {margin-top:12px;padding:10px 18px;border-radius:8px;border:none;background:#238636;color:white;cursor:pointer;}
     button:hover {background:#2ea043;}
-    .copy-btn {background:#4ade80;color:#0d1117;}
-    .copy-btn:hover {background:#22c55e;}
-    .output {margin-top:10px;padding:12px;background:#0d1117;border:1px dashed #30363d;border-radius:8px;font-family:"JetBrains Mono",monospace;font-size:0.95rem;white-space:pre-wrap;word-break:break-word;}
-    .row {display:grid;grid-template-columns:1fr;gap:16px;}
-    @media(min-width:860px){.row{grid-template-columns:1fr 1fr;}}
-    .footer{text-align:center;margin-top:30px;color:#6e7681;font-size:0.9rem;}
+    .output {margin-top:10px;padding:12px;background:#0d1117;border:1px dashed #30363d;border-radius:8px;font-family:"JetBrains Mono",monospace;}
+    table {width:100%;border-collapse:collapse;margin-top:10px;}
+    th,td {border:1px solid #30363d;padding:8px;text-align:center;}
+    th {background:#21262d;color:#79c0ff;}
+    .footer {text-align:center;margin-top:30px;color:#6e7681;}
   </style>
 </head>
 <body>
-  <div class="container">
-    <h1>النظام الترددي اللغوي — ضغط RLE</h1>
-    <label>مفتاح المستخدم (رقم كبير):</label>
-    <input id="userKey" type="number" value="123456789">
-    <div class="row">
-      <div>
-        <h2>تحويل جملة إلى ترددات</h2>
-        <textarea id="sentenceInput" placeholder="أدخل نصًا عربيًا هنا..."></textarea>
-        <button onclick="encodeSentence()">تحويل</button>
-        <button class="copy-btn" onclick="copyAllFreqs()">نسخ الترددات</button>
-        <div class="output" id="encodeOutput">—</div>
-      </div>
-      <div>
-        <h2>تحويل ترددات إلى جملة</h2>
-        <textarea id="freqListInput" placeholder="أدخل الترددات هنا..."></textarea>
-        <button onclick="decodeFreqList()">تحويل</button>
-        <div class="output" id="decodeOutput">—</div>
-      </div>
-    </div>
-    <div class="footer">م: رأفت عمر</div>
-  </div>
+<div class="container">
+  <h1>النظام الرسمي BRHM-LNS</h1>
+
+  <h2>إعدادات المجال الترددي (مفتاح المستخدم)</h2>
+  <label>بداية المجال f0:</label>
+  <input id="f0Input" type="number" value="100000">
+  <label>خطوة التردد Δf:</label>
+  <input id="dfInput" type="number" value="1">
+
+  <h2>تحويل كلمة ↔ عدد لغوي ↔ تردد</h2>
+  <label>أدخل كلمة عربية:</label>
+  <textarea id="wordInput" placeholder="مثال: برهوم"></textarea>
+  <button onclick="encodeWord()">تحويل</button>
+  <div class="output" id="encodeOutput">—</div>
+
+  <h2>تحويل عدد ↔ كلمة</h2>
+  <label>أدخل عدد عشري ضخم:</label>
+  <textarea id="bigIntInput"></textarea>
+  <button onclick="decodeBigInt()">تحويل</button>
+  <div class="output" id="decodeOutput">—</div>
+
+  <div class="footer">م: برهوم — الإصدار الرسمي الأول للنظام</div>
+</div>
 
 <script>
-  const B=32, LMAX=12, f0=100000, df=1;
-  const indexToChar={0:"",1:"ا",2:"ب",3:"ت",4:"ث",5:"ج",6:"ح",7:"خ",8:"د",9:"ذ",10:"ر",11:"ز",12:"س",13:"ش",14:"ص",15:"ض",16:"ط",17:"ظ",18:"ع",19:"غ",20:"ف",21:"ق",22:"ك",23:"ل",24:"م",25:"ن",26:"ه",27:"و",28:"ي"};
-  const charToIndex={};for(const[i,ch]of Object.entries(indexToChar)){if(ch)charToIndex[ch]=parseInt(i);}
-  function normalizeArabic(s){return(s||"").replace(/[إأآ]/g,"ا").replace(/ى/g,"ي").replace(/ؤ/g,"و").replace(/ئ/g,"ي").replace(/ة/g,"ه");}
-  function splitWord(word){const blocks=[];for(let i=0;i<word.length;i+=LMAX){blocks.push(word.slice(i,i+LMAX));}return blocks;}
-  function wordToCode(word){const c=new Array(LMAX).fill(0);let pos=0;for(let i=word.length-1;i>=0;i--){const idx=charToIndex[word[i]];if(idx===undefined)throw new Error("حرف غير مدعوم:"+word[i]);c[pos++]=idx;}let C=0n;for(let i=0;i<LMAX;i++){C+=BigInt(c[i])*(BigInt(B)**BigInt(i));}return C;}
-  function codeToWord(Cbig){let C=BigInt(Cbig);const digits=[];for(let i=0;i<LMAX;i++){digits.push(Number(C%BigInt(B)));C/=BigInt(B);}let w="";for(let i=LMAX-1;i>=0;i--){w+=indexToChar[digits[i]]||"";}return w;}
+  // إعدادات الحروف
+  const alphabet = ["ا","ب","ت","ث","ج","ح","خ","د","ذ","ر","ز","س","ش","ص","ض","ط","ظ","ع","غ","ف","ق","ك","ل","م","ن","ه","و","ي"];
+  const base = 28**3; // أساس النظام (رمز = 3 حروف)
 
-  // ضغط RLE
-  function rleCompress(str){let out="",count=1;for(let i=1;i<=str.length;i++){if(str[i]===str[i-1]){count++;}else{out+=str[i-1]+(count>1?count:"");count=1;}}return out;}
-  function rleDecompress(str){let out="",i=0;while(i<str.length){let ch=str[i++];let num="";while(i<str.length&&/[0-9]/.test(str[i])){num+=str[i++];}out+=ch.repeat(num?parseInt(num):1);}return out;}
-
-  window.lastFreqList=null;
-
-  function encodeSentence(){
-    const key=BigInt(document.getElementById("userKey").value||"0");
-    const sentence=normalizeArabic(document.getElementById("sentenceInput").value.trim());
-    if(!sentence){document.getElementById("encodeOutput").textContent="لا يوجد نص.";return;}
-    const compressed=rleCompress(sentence);
-    const words=compressed.split(/\s+/);
-    let allFreqs=[];
-    words.forEach(word=>{const blocks=splitWord(word);blocks.forEach(block=>{const C=wordToCode(block);const C2=C^key;const f=f0+Number(C2)*df;allFreqs.push(f);});});
-    document.getElementById("encodeOutput").textContent=allFreqs.join("\n");
-    window.lastFreqList=allFreqs;
+  // تحويل رمز (3 حروف) إلى رقم
+  function symbolToNumber(sym){
+    let [c1,c2,c3] = sym.split("");
+    let i1 = alphabet.indexOf(c1)+1;
+    let i2 = alphabet.indexOf(c2)+1;
+    let i3 = alphabet.indexOf(c3)+1;
+    if(i1<0||i2<0||i3<0) throw new Error("حرف غير مدعوم");
+    return i1*28*28 + i2*28 + i3;
   }
 
-  function copyAllFreqs(){if(!window.lastFreqList)return;const text=window.lastFreqList.join("\n");const temp=document.createElement("textarea");temp.value=text;document.body.appendChild(temp);temp.select();document.execCommand("copy");document.body.removeChild(temp);}
+  // تحويل رقم إلى رمز (3 حروف)
+  function numberToSymbol(num){
+    let i1 = Math.floor(num/(28*28));
+    let rem = num%(28*28);
+    let i2 = Math.floor(rem/28);
+    let i3 = rem%28;
+    return alphabet[i1-1]+alphabet[i2-1]+alphabet[i3-1];
+  }
 
-  function decodeFreqList(){
-    const key=BigInt(document.getElementById("userKey").value||"0");
-    const input=document.getElementById("freqListInput").value.trim();if(!input){document.getElementById("decodeOutput").textContent="لا توجد ترددات.";return;}
-    const lines=input.split(/\n+/);let decoded="";
-    lines.forEach(line=>{const freq=Number(line.trim());if(isNaN(freq))return;const C2=BigInt(Math.round((freq-f0)/df));const C=C2^key;decoded+=codeToWord(C);});
-    const decompressed=rleDecompress(decoded);
-    document.getElementById("decodeOutput").textContent=decompressed;
+  // إضافة رمز النهاية #
+  function addEndSymbol(word){
+    return word+"#";
+  }
+
+  // تقسيم الكلمة إلى رموز (3 حروف)
+  function splitWord(word){
+    let w = addEndSymbol(word);
+    let blocks=[];
+    for(let i=0;i<w.length;i+=3){
+      blocks.push(w.slice(i,i+3));
+    }
+    return blocks;
+  }
+
+  // كلمة → BigInt
+  function wordToBigInt(word){
+    let blocks=splitWord(word);
+    let n=0n;
+    for(let b of blocks){
+      if(b.includes("#")){ // رمز النهاية
+        n = n*BigInt(base) + BigInt(0);
+      }else{
+        n = n*BigInt(base) + BigInt(symbolToNumber(b));
+      }
+    }
+    return n;
+  }
+
+  // BigInt → كلمة
+  function bigIntToWord(str){
+    let n=BigInt(str);
+    let blocks=[];
+    while(n>0n){
+      let r = n%BigInt(base);
+      n = n/BigInt(base);
+      blocks.unshift(r==0n?"#":numberToSymbol(Number(r)));
+    }
+    return blocks.join("");
+  }
+
+  // كلمة → تردد
+  function wordToFreq(word,f0,df){
+    let N=wordToBigInt(word);
+    return Number(f0)+Number(N)*Number(df);
+  }
+
+  // واجهة المستخدم
+  function encodeWord(){
+    let word=document.getElementById("wordInput").value.trim();
+    let f0=document.getElementById("f0Input").value;
+    let df=document.getElementById("dfInput").value;
+    try{
+      let N=wordToBigInt(word);
+      let freq=wordToFreq(word,f0,df);
+      document.getElementById("encodeOutput").textContent=
+        "الكلمة: "+word+"\nBigInt: "+N+"\nالتردد: "+freq+" Hz";
+    }catch(e){document.getElementById("encodeOutput").textContent="خطأ: "+e.message;}
+  }
+
+  function decodeBigInt(){
+    let str=document.getElementById("bigIntInput").value.trim();
+    try{
+      let word=bigIntToWord(str);
+      document.getElementById("decodeOutput").textContent="الكلمة: "+word;
+    }catch(e){document.getElementById("decodeOutput").textContent="خطأ: "+e.message;}
   }
 </script>
 </body>
