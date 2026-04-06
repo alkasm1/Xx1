@@ -70,14 +70,22 @@ button:hover { background: #2ea043; }
 
 <!-- القسم الثاني: فك الترميز -->
 <h2>2) QR → الجملة</h2>
-<label>النص المستخرج من QR:</label>
-<textarea id="qrInput" placeholder="الصق النص هنا أو استخدم الكاميرا..."></textarea>
 
-<button onclick="decodeFromQR()">تحويل إلى كلمات</button>
+<label>النص المستخرج من QR:</label>
+<textarea id="qrInput" placeholder="الصق النص هنا أو استخدم الكاميرا أو ارفع صورة..."></textarea>
+
+<label>أو اختر صورة QR من جهازك:</label>
+<input id="qrFileInput" type="file" accept="image/*" />
+
+<button onclick="decodeFromQR()">تحويل النص إلى كلمات</button>
+<button onclick="decodeFromQRImage()">تحويل صورة QR إلى كلمات</button>
 
 <div class="output" id="decodeOutput">—</div>
 
 </div>
+
+<!-- عنصر مخفي لفك QR من الصورة -->
+<div id="reader-temp" style="display:none;"></div>
 
 <script>
 /* ------------------------------
@@ -213,7 +221,7 @@ function startScanner(){
 }
 
 /* ------------------------------
-   فك QR إلى كلمات
+   فك QR من النص
 --------------------------------*/
 function decodeFromQR(){
   const key = BigInt(document.getElementById("userKey").value || "0");
@@ -232,6 +240,41 @@ function decodeFromQR(){
   });
 
   document.getElementById("decodeOutput").textContent = words.join(" ");
+}
+
+/* ------------------------------
+   فك QR من صورة مرفوعة
+--------------------------------*/
+async function decodeFromQRImage(){
+  const fileInput = document.getElementById("qrFileInput");
+  const file = fileInput.files[0];
+  if (!file) return;
+
+  const key = BigInt(document.getElementById("userKey").value || "0");
+
+  const html5Qr = new Html5Qrcode("reader-temp");
+
+  try {
+    const result = await html5Qr.scanFile(file, true);
+    const data = result;
+
+    const freqs = data.split("|");
+    const words = [];
+
+    freqs.forEach(f => {
+      const fFull = BigInt(f);
+      const C2 = (fFull - f0) / df;
+      const C  = C2 ^ key;
+      const block = codeToWord(C);
+      words.push(block);
+    });
+
+    document.getElementById("decodeOutput").textContent = words.join(" ");
+  } catch (e) {
+    document.getElementById("decodeOutput").textContent = "فشل في قراءة صورة الـ QR.";
+  } finally {
+    html5Qr.clear();
+  }
 }
 </script>
 
