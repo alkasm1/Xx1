@@ -2,7 +2,7 @@
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8">
-  <title>النظام الترددي اللغوي — ترددات شخصية لكل مستخدم</title>
+  <title>النظام الترددي اللغوي — معامل اختصار مشترك أكبر</title>
 
   <style>
     body {
@@ -42,7 +42,7 @@
       font-size: 0.95rem;
     }
 
-    textarea, input[type="number"], select {
+    textarea, input[type="number"], input[type="text"] {
       width: 100%;
       padding: 10px;
       border-radius: 8px;
@@ -51,6 +51,11 @@
       color: #e6edf3;
       font-size: 0.95rem;
       margin-top: 4px;
+    }
+
+    textarea {
+      height: 120px;
+      resize: vertical;
     }
 
     button {
@@ -94,47 +99,46 @@
       color: #6e7681;
       font-size: 0.9rem;
     }
+
+    .hint {
+      font-size: 0.85rem;
+      color: #9ca3af;
+      margin-top: 4px;
+    }
   </style>
 </head>
 
 <body>
 
   <div class="container">
-    <h1>النظام الترددي اللغوي — ترددات شخصية لكل مستخدم</h1>
+    <h1>النظام الترددي اللغوي — معامل الاختصار المشترك الأكبر</h1>
 
     <label>مفتاح المستخدم (رقم كبير مشترك بين المرسل والمستقبل):</label>
     <input id="userKey" type="number" value="123456789">
 
-    <label>معامل اختصار التردد (لا يمس الكود):</label>
-    <select id="shortFactor">
-      <option value="1">بدون اختصار (1)</option>
-      <option value="2">2</option>
-      <option value="4">4</option>
-      <option value="8">8</option>
-      <option value="16">16</option>
-      <option value="32">32</option>
-      <option value="64">64</option>
-      <option value="128">128</option>
-      <option value="256">256</option>
-      <option value="512">512</option>
-      <option value="1024">1024</option>
-    </select>
+    <label>معامل الاختصار المشترك الأكبر (يُحسب من الترددات):</label>
+    <input id="gcdFactor" type="text" readonly value="1">
+    <div class="hint">بعد كتابة الجملة والضغط على "تحويل"، سيُحسب هنا أكبر معامل اختصار مشترك لكل الترددات.</div>
 
     <div class="row">
 
       <div>
-        <h2>تحويل جملة إلى ترددات</h2>
+        <h2>تحويل جملة إلى ترددات مختصرة</h2>
         <label>أدخل نصًا عربيًا:</label>
         <textarea id="sentenceInput" placeholder="أدخل نصًا عربيًا هنا..."></textarea>
         <button onclick="encodeSentence()">تحويل</button>
-        <button class="copy-btn" onclick="copyAllFreqs()">نسخ جميع الترددات</button>
+        <button class="copy-btn" onclick="copyAllFreqs()">نسخ الترددات المختصرة</button>
         <div class="output" id="encodeOutput">—</div>
       </div>
 
       <div>
-        <h2>تحويل ترددات إلى جملة</h2>
-        <label>أدخل الترددات (كل تردد في سطر):</label>
-        <textarea id="freqListInput"></textarea>
+        <h2>تحويل ترددات مختصرة إلى جملة</h2>
+        <label>أدخل الترددات المختصرة (كل تردد في سطر):</label>
+        <textarea id="freqListInput" placeholder="كل تردد مختصر في سطر..."></textarea>
+
+        <label>معامل الاختصار المستخدم (نفس القيمة الظاهرة في الأعلى عند الترميز):</label>
+        <input id="gcdInput" type="text" value="1">
+
         <button onclick="decodeFreqList()">تحويل</button>
         <div class="output" id="decodeOutput">—</div>
       </div>
@@ -142,7 +146,7 @@
     </div>
 
     <div class="footer">
-      م: رأفت عمر — نسخة اختصار التردد فقط
+      م: رأفت عمر — نسخة معامل الاختصار المشترك الأكبر
     </div>
   </div>
 
@@ -210,36 +214,72 @@
     return w;
   }
 
+  function gcdBigInt(a, b) {
+    a = a < 0n ? -a : a;
+    b = b < 0n ? -b : b;
+    while (b !== 0n) {
+      const t = b;
+      b = a % b;
+      a = t;
+    }
+    return a;
+  }
+
+  function gcdArrayBigInt(arr) {
+    if (arr.length === 0) return 1n;
+    let g = arr[0] < 0n ? -arr[0] : arr[0];
+    for (let i = 1; i < arr.length; i++) {
+      g = gcdBigInt(g, arr[i]);
+      if (g === 1n) break;
+    }
+    return g === 0n ? 1n : g;
+  }
+
+  let lastK = 1n;
+
   function encodeSentence(){
     const key = BigInt(document.getElementById("userKey").value || "0");
-    const K = BigInt(document.getElementById("shortFactor").value || "1");
+    const sentenceRaw = document.getElementById("sentenceInput").value.trim();
+    const sentence = normalizeArabic(sentenceRaw);
 
-    const sentence = normalizeArabic(document.getElementById("sentenceInput").value.trim());
     if (!sentence) {
       document.getElementById("encodeOutput").textContent = "لا يوجد نص.";
+      document.getElementById("gcdFactor").value = "1";
+      lastK = 1n;
       return;
     }
 
     const words = sentence.split(/\s+/);
-    let allFreqs = [];
+    const fullFreqs = [];
 
     words.forEach(word => {
       const blocks = splitWord(word);
       blocks.forEach(block => {
         const C  = wordToCode(block);
         const C2 = C ^ key;
-        const fFull = f0 + C2 * df;
-
-        const fShort = fFull / K;   // اختصار التردد فقط
-
-        allFreqs.push(fShort.toString());
+        const fFull = f0 + C2 * df;   // تردد كامل لكل بلوك
+        fullFreqs.push(fFull);
       });
     });
 
-    document.getElementById("encodeOutput").textContent =
-      allFreqs.join("\n");
+    if (fullFreqs.length === 0) {
+      document.getElementById("encodeOutput").textContent = "لا توجد ترددات.";
+      document.getElementById("gcdFactor").value = "1";
+      lastK = 1n;
+      return;
+    }
 
-    window.lastFreqList = allFreqs;
+    const K = gcdArrayBigInt(fullFreqs);   // المعامل المشترك الأكبر
+    lastK = K;
+    document.getElementById("gcdFactor").value = K.toString();
+    document.getElementById("gcdInput").value = K.toString();
+
+    const shortFreqs = fullFreqs.map(f => (f / K).toString());
+
+    document.getElementById("encodeOutput").textContent =
+      shortFreqs.join("\n");
+
+    window.lastFreqList = shortFreqs;
   }
 
   function copyAllFreqs(){
@@ -250,7 +290,14 @@
 
   function decodeFreqList(){
     const key = BigInt(document.getElementById("userKey").value || "0");
-    const K = BigInt(document.getElementById("shortFactor").value || "1");
+    const Kstr = document.getElementById("gcdInput").value.trim() || "1";
+    let K;
+    try {
+      K = BigInt(Kstr);
+      if (K === 0n) K = 1n;
+    } catch {
+      K = 1n;
+    }
 
     const input = document.getElementById("freqListInput").value.trim();
     if (!input) {
@@ -262,12 +309,19 @@
     const words = [];
 
     lines.forEach(line => {
-      const fShort = BigInt(line.trim());
-      const fFull  = fShort * K;
+      const t = line.trim();
+      if (!t) return;
 
+      let fShort;
+      try {
+        fShort = BigInt(t);
+      } catch {
+        return;
+      }
+
+      const fFull = fShort * K;
       const C2 = (fFull - f0) / df;
       const C  = C2 ^ key;
-
       const block = codeToWord(C);
       words.push(block);
     });
