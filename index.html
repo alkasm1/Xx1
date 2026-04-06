@@ -42,7 +42,20 @@
       font-size: 0.95rem;
     }
 
-    textarea, input[type="number"], select {
+    textarea {
+      width: 100%;
+      padding: 10px;
+      margin-top: 4px;
+      border-radius: 8px;
+      border: 1px solid #30363d;
+      background: #0d1117;
+      color: #e6edf3;
+      font-size: 1rem;
+      height: 120px;
+      resize: vertical;
+    }
+
+    input[type="number"], select {
       width: 100%;
       padding: 10px;
       border-radius: 8px;
@@ -105,14 +118,19 @@
     <label>مفتاح المستخدم (رقم كبير مشترك بين المرسل والمستقبل):</label>
     <input id="userKey" type="number" value="123456789">
 
-    <label>معامل اختصار التردد (قوى 2 فقط — آمنة 100%):</label>
+    <label>معامل اختصار التردد (يؤثر على التردد فقط، لا يمس الكود):</label>
     <select id="shortFactor">
       <option value="1">بدون اختصار (1)</option>
+      <option value="2">2</option>
+      <option value="4">4</option>
+      <option value="8">8</option>
+      <option value="16">16</option>
       <option value="32">32</option>
+      <option value="64">64</option>
+      <option value="128">128</option>
+      <option value="256">256</option>
+      <option value="512">512</option>
       <option value="1024">1024</option>
-      <option value="32768">32768</option>
-      <option value="1048576">1048576</option>
-      <option value="33554432">33554432</option>
     </select>
 
     <div class="row">
@@ -129,7 +147,10 @@
       <div>
         <h2>تحويل ترددات إلى جملة</h2>
         <label>أدخل الترددات (كل تردد في سطر):</label>
-        <textarea id="freqListInput"></textarea>
+        <textarea id="freqListInput" placeholder="مثال:
+1915265
+19757432
+28746170"></textarea>
         <button onclick="decodeFreqList()">تحويل</button>
         <div class="output" id="decodeOutput">—</div>
       </div>
@@ -137,16 +158,18 @@
     </div>
 
     <div class="footer">
-      م: رأفت عمر — نسخة اختصار التردد فقط
+      م: رأفت عمر
     </div>
   </div>
 
 <script>
+  // إعدادات المجال
   const B = 32;
-  const LMAX = 12;
+  const LMAX = 12;   // يدعم كلمات طويلة جدًا
   const f0 = 100000;
   const df = 1;
 
+  // التطبيع العربي
   function normalizeArabic(s) {
     return (s || "")
       .replace(/[إأآ]/g, "ا")
@@ -156,6 +179,7 @@
       .replace(/ة/g, "ه");
   }
 
+  // جدول الحروف
   const indexToChar = {
     0:"",1:"ا",2:"ب",3:"ت",4:"ث",5:"ج",6:"ح",7:"خ",
     8:"د",9:"ذ",10:"ر",11:"ز",12:"س",13:"ش",14:"ص",
@@ -168,6 +192,7 @@
     if (ch) charToIndex[ch] = parseInt(i, 10);
   }
 
+  // تقسيم الكلمة إلى بلوكات بطول LMAX
   function splitWord(word) {
     const blocks = [];
     for (let i = 0; i < word.length; i += LMAX) {
@@ -176,6 +201,7 @@
     return blocks;
   }
 
+  // تحويل بلوك إلى كود عددي
   function wordToCode(word){
     const c = new Array(LMAX).fill(0);
     let pos = 0;
@@ -186,11 +212,13 @@
     }
     let C = 0n;
     for (let i = 0; i < LMAX; i++){
+      // التصحيح هنا: استخدام الأسّ الصحيح
       C += BigInt(c[i]) * (BigInt(B) ** BigInt(i));
     }
     return C;
   }
 
+  // تحويل كود عددي إلى بلوك
   function codeToWord(Cbig){
     let C = BigInt(Cbig);
     const digits = [];
@@ -205,11 +233,15 @@
     return w;
   }
 
+  // ترميز جملة إلى ترددات مع مفتاح مستخدم + اختصار التردد فقط
   function encodeSentence(){
-    const key = BigInt(document.getElementById("userKey").value || "0");
-    const K = BigInt(document.getElementById("shortFactor").value);
+    const keyStr = document.getElementById("userKey").value || "0";
+    const key = BigInt(keyStr);
 
-    const sentence = normalizeArabic(document.getElementById("sentenceInput").value.trim());
+    const K = Number(document.getElementById("shortFactor").value) || 1;
+
+    const sentenceRaw = document.getElementById("sentenceInput").value.trim();
+    const sentence = normalizeArabic(sentenceRaw);
     if (!sentence) {
       document.getElementById("encodeOutput").textContent = "لا يوجد نص.";
       return;
@@ -221,11 +253,12 @@
     words.forEach(word => {
       const blocks = splitWord(word);
       blocks.forEach(block => {
-        const C  = wordToCode(block);
-        const C2 = C ^ key;              // الكود المشفر
-        const f  = f0 + Number(C2);      // التردد الأصلي
+        const C = wordToCode(block);        // كود الكلمة
+        const C2 = C ^ key;                 // دمج المفتاح الشخصي
+        const f  = f0 + Number(C2) * df;    // التردد الأصلي الكامل
 
-        const f_short = Math.floor(f / Number(K));   // ← اختصار التردد فقط
+        // اختصار التردد فقط (لا نمس C ولا C2)
+        const f_short = Math.floor(f / K);
 
         allFreqs.push(f_short);
       });
@@ -237,15 +270,31 @@
     window.lastFreqList = allFreqs;
   }
 
+  // نسخ جميع الترددات
   function copyAllFreqs(){
     if (!window.lastFreqList || window.lastFreqList.length === 0) return;
+
     const text = window.lastFreqList.join("\n");
-    navigator.clipboard.writeText(text);
+
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(text);
+      return;
+    }
+
+    const temp = document.createElement("textarea");
+    temp.value = text;
+    document.body.appendChild(temp);
+    temp.select();
+    document.execCommand("copy");
+    document.body.removeChild(temp);
   }
 
+  // فك الترددات إلى جملة مع نفس مفتاح المستخدم + عكس اختصار التردد
   function decodeFreqList(){
-    const key = BigInt(document.getElementById("userKey").value || "0");
-    const K = BigInt(document.getElementById("shortFactor").value);
+    const keyStr = document.getElementById("userKey").value || "0";
+    const key = BigInt(keyStr);
+
+    const K = Number(document.getElementById("shortFactor").value) || 1;
 
     const input = document.getElementById("freqListInput").value.trim();
     if (!input) {
@@ -257,13 +306,17 @@
     const words = [];
 
     lines.forEach(line => {
-      const f_short = Number(line.trim());
+      const t = line.trim();
+      if (!t) return;
+
+      const f_short = Number(t);
       if (isNaN(f_short)) return;
 
-      const f = f_short * Number(K);     // ← إعادة التوسيع
-      const C2 = BigInt(f - f0);         // الكود المشفر
-      const C  = C2 ^ key;               // إزالة XOR
+      // إعادة التوسيع لعكس الاختصار
+      const f = f_short * K;
 
+      const C2 = BigInt(Math.round((f - f0) / df)); // الكود بعد التشفير
+      const C = C2 ^ key;                           // إزالة المفتاح
       const block = codeToWord(C);
       words.push(block);
     });
