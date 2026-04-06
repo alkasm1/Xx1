@@ -58,30 +58,39 @@ button:hover { background: #2ea043; }
 <textarea id="sentenceInput" placeholder="أدخل جملة عربية..."></textarea>
 
 <button onclick="encodeToQR()">تحويل إلى QR</button>
-<button onclick="saveQR()">حفظ صورة QR في الهاتف</button>
-<button onclick="startScanner()">مسح QR بالكاميرا</button>
+<button onclick="saveQR()">حفظ صورة QR</button>
 
 <div id="qrcode"></div>
-<div id="reader" style="display:none;"></div>
 
-<h2>2) QR → الجملة</h2>
+<!-- زر المشاركة تحت الباركود -->
+<div style="text-align:center; margin-top:10px;">
+  <button onclick="shareQR()">مشاركة الباركود</button>
+</div>
+
+<h2>2) QR → كلمات</h2>
+
+<button onclick="startScanner()">مسح الباركود بالكاميرا</button>
 
 <label>النص المستخرج من QR:</label>
-<textarea id="qrInput" placeholder="الصق النص هنا أو استخدم الكاميرا أو ارفع صورة..."></textarea>
+<textarea id="qrInput" placeholder="الصق النص هنا أو ارفع صورة QR..."></textarea>
 
 <label>أو اختر صورة QR من جهازك:</label>
-<input id="qrFileInput" type="file" accept="image/*" capture="environment" />
+<input id="qrFileInput" type="file" accept="image/*" />
 
-<button onclick="decodeFromQR()">تحويل النص إلى كلمات</button>
+<button onclick="decodeFromQR()">تحويل الباركود إلى كلمات</button>
 <button onclick="decodeFromQRImage()">تحويل صورة QR إلى كلمات</button>
 
 <div class="output" id="decodeOutput">—</div>
 
 </div>
 
+<div id="reader" style="display:none;"></div>
 <div id="reader-temp" style="display:none;"></div>
 
 <script>
+/* ------------------------------
+   نظام الترميز الترددي
+--------------------------------*/
 const B = 32;
 const LMAX = 12;
 const f0 = 100000n;
@@ -145,6 +154,9 @@ function codeToWord(Cbig){
   return w;
 }
 
+/* ------------------------------
+   توليد QR
+--------------------------------*/
 function encodeToQR(){
   const key = BigInt(document.getElementById("userKey").value || "0");
   const sentence = normalizeArabic(document.getElementById("sentenceInput").value.trim());
@@ -174,6 +186,9 @@ function encodeToQR(){
   });
 }
 
+/* ------------------------------
+   حفظ QR
+--------------------------------*/
 function saveQR(){
   const img = document.querySelector("#qrcode img");
   if (!img) return;
@@ -181,11 +196,32 @@ function saveQR(){
   const link = document.createElement("a");
   link.href = img.src;
   link.download = "qr-code.png";
-  document.body.appendChild(link);
   link.click();
-  document.body.removeChild(link);
 }
 
+/* ------------------------------
+   مشاركة QR
+--------------------------------*/
+async function shareQR(){
+  const img = document.querySelector("#qrcode img");
+  if (!img) return;
+
+  const response = await fetch(img.src);
+  const blob = await response.blob();
+  const file = new File([blob], "qr-code.png", { type: "image/png" });
+
+  if (navigator.share) {
+    navigator.share({
+      files: [file],
+      title: "QR Code",
+      text: "صورة الباركود"
+    });
+  }
+}
+
+/* ------------------------------
+   مسح بالكاميرا
+--------------------------------*/
 function startScanner(){
   const reader = document.getElementById("reader");
   reader.style.display = "block";
@@ -203,6 +239,9 @@ function startScanner(){
   );
 }
 
+/* ------------------------------
+   فك QR من النص
+--------------------------------*/
 function decodeFromQR(){
   const key = BigInt(document.getElementById("userKey").value || "0");
   const data = document.getElementById("qrInput").value.trim();
@@ -222,6 +261,9 @@ function decodeFromQR(){
   document.getElementById("decodeOutput").textContent = words.join(" ");
 }
 
+/* ------------------------------
+   فك QR من صورة
+--------------------------------*/
 async function decodeFromQRImage(){
   const fileInput = document.getElementById("qrFileInput");
   const file = fileInput.files[0];
