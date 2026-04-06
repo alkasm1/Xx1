@@ -42,20 +42,7 @@
       font-size: 0.95rem;
     }
 
-    textarea {
-      width: 100%;
-      padding: 10px;
-      margin-top: 4px;
-      border-radius: 8px;
-      border: 1px solid #30363d;
-      background: #0d1117;
-      color: #e6edf3;
-      font-size: 1rem;
-      height: 120px;
-      resize: vertical;
-    }
-
-    input[type="number"], select {
+    textarea, input[type="number"], select {
       width: 100%;
       padding: 10px;
       border-radius: 8px;
@@ -118,7 +105,7 @@
     <label>مفتاح المستخدم (رقم كبير مشترك بين المرسل والمستقبل):</label>
     <input id="userKey" type="number" value="123456789">
 
-    <label>معامل اختصار التردد (يؤثر على التردد فقط، لا يمس الكود):</label>
+    <label>معامل اختصار التردد (لا يمس الكود):</label>
     <select id="shortFactor">
       <option value="1">بدون اختصار (1)</option>
       <option value="2">2</option>
@@ -147,10 +134,7 @@
       <div>
         <h2>تحويل ترددات إلى جملة</h2>
         <label>أدخل الترددات (كل تردد في سطر):</label>
-        <textarea id="freqListInput" placeholder="مثال:
-1915265
-19757432
-28746170"></textarea>
+        <textarea id="freqListInput"></textarea>
         <button onclick="decodeFreqList()">تحويل</button>
         <div class="output" id="decodeOutput">—</div>
       </div>
@@ -158,7 +142,7 @@
     </div>
 
     <div class="footer">
-      م: رأفت عمر
+      م: رأفت عمر — نسخة اختصار التردد فقط
     </div>
   </div>
 
@@ -227,13 +211,10 @@
   }
 
   function encodeSentence(){
-    const keyStr = document.getElementById("userKey").value || "0";
-    const key = BigInt(keyStr);
-
+    const key = BigInt(document.getElementById("userKey").value || "0");
     const K = BigInt(document.getElementById("shortFactor").value || "1");
 
-    const sentenceRaw = document.getElementById("sentenceInput").value.trim();
-    const sentence = normalizeArabic(sentenceRaw);
+    const sentence = normalizeArabic(document.getElementById("sentenceInput").value.trim());
     if (!sentence) {
       document.getElementById("encodeOutput").textContent = "لا يوجد نص.";
       return;
@@ -245,11 +226,11 @@
     words.forEach(word => {
       const blocks = splitWord(word);
       blocks.forEach(block => {
-        const C  = wordToCode(block);      // BigInt
-        const C2 = C ^ key;               // BigInt
-        const fFull = f0 + C2 * df;       // BigInt التردد الكامل
+        const C  = wordToCode(block);
+        const C2 = C ^ key;
+        const fFull = f0 + C2 * df;
 
-        const fShort = fFull / K;         // اختصار التردد فقط (قسمة صحيحة)
+        const fShort = fFull / K;   // اختصار التردد فقط
 
         allFreqs.push(fShort.toString());
       });
@@ -263,26 +244,12 @@
 
   function copyAllFreqs(){
     if (!window.lastFreqList || window.lastFreqList.length === 0) return;
-
     const text = window.lastFreqList.join("\n");
-
-    if (navigator.clipboard && window.isSecureContext) {
-      navigator.clipboard.writeText(text);
-      return;
-    }
-
-    const temp = document.createElement("textarea");
-    temp.value = text;
-    document.body.appendChild(temp);
-    temp.select();
-    document.execCommand("copy");
-    document.body.removeChild(temp);
+    navigator.clipboard.writeText(text);
   }
 
   function decodeFreqList(){
-    const keyStr = document.getElementById("userKey").value || "0";
-    const key = BigInt(keyStr);
-
+    const key = BigInt(document.getElementById("userKey").value || "0");
     const K = BigInt(document.getElementById("shortFactor").value || "1");
 
     const input = document.getElementById("freqListInput").value.trim();
@@ -295,14 +262,12 @@
     const words = [];
 
     lines.forEach(line => {
-      const t = line.trim();
-      if (!t) return;
+      const fShort = BigInt(line.trim());
+      const fFull  = fShort * K;
 
-      const fShort = BigInt(t);          // التردد المختصر
-      const fFull  = fShort * K;         // إعادة التوسيع
+      const C2 = (fFull - f0) / df;
+      const C  = C2 ^ key;
 
-      const C2 = (fFull - f0) / df;      // BigInt
-      const C  = C2 ^ key;               // BigInt
       const block = codeToWord(C);
       words.push(block);
     });
