@@ -163,13 +163,11 @@
   </div>
 
 <script>
-  // إعدادات المجال
   const B = 32;
-  const LMAX = 12;   // يدعم كلمات طويلة جدًا
-  const f0 = 100000;
-  const df = 1;
+  const LMAX = 12;
+  const f0 = 100000n;
+  const df = 1n;
 
-  // التطبيع العربي
   function normalizeArabic(s) {
     return (s || "")
       .replace(/[إأآ]/g, "ا")
@@ -179,7 +177,6 @@
       .replace(/ة/g, "ه");
   }
 
-  // جدول الحروف
   const indexToChar = {
     0:"",1:"ا",2:"ب",3:"ت",4:"ث",5:"ج",6:"ح",7:"خ",
     8:"د",9:"ذ",10:"ر",11:"ز",12:"س",13:"ش",14:"ص",
@@ -192,7 +189,6 @@
     if (ch) charToIndex[ch] = parseInt(i, 10);
   }
 
-  // تقسيم الكلمة إلى بلوكات بطول LMAX
   function splitWord(word) {
     const blocks = [];
     for (let i = 0; i < word.length; i += LMAX) {
@@ -201,7 +197,6 @@
     return blocks;
   }
 
-  // تحويل بلوك إلى كود عددي
   function wordToCode(word){
     const c = new Array(LMAX).fill(0);
     let pos = 0;
@@ -212,13 +207,11 @@
     }
     let C = 0n;
     for (let i = 0; i < LMAX; i++){
-      // التصحيح هنا: استخدام الأسّ الصحيح
       C += BigInt(c[i]) * (BigInt(B) ** BigInt(i));
     }
     return C;
   }
 
-  // تحويل كود عددي إلى بلوك
   function codeToWord(Cbig){
     let C = BigInt(Cbig);
     const digits = [];
@@ -233,12 +226,11 @@
     return w;
   }
 
-  // ترميز جملة إلى ترددات مع مفتاح مستخدم + اختصار التردد فقط
   function encodeSentence(){
     const keyStr = document.getElementById("userKey").value || "0";
     const key = BigInt(keyStr);
 
-    const K = Number(document.getElementById("shortFactor").value) || 1;
+    const K = BigInt(document.getElementById("shortFactor").value || "1");
 
     const sentenceRaw = document.getElementById("sentenceInput").value.trim();
     const sentence = normalizeArabic(sentenceRaw);
@@ -253,14 +245,13 @@
     words.forEach(word => {
       const blocks = splitWord(word);
       blocks.forEach(block => {
-        const C = wordToCode(block);        // كود الكلمة
-        const C2 = C ^ key;                 // دمج المفتاح الشخصي
-        const f  = f0 + Number(C2) * df;    // التردد الأصلي الكامل
+        const C  = wordToCode(block);      // BigInt
+        const C2 = C ^ key;               // BigInt
+        const fFull = f0 + C2 * df;       // BigInt التردد الكامل
 
-        // اختصار التردد فقط (لا نمس C ولا C2)
-        const f_short = Math.floor(f / K);
+        const fShort = fFull / K;         // اختصار التردد فقط (قسمة صحيحة)
 
-        allFreqs.push(f_short);
+        allFreqs.push(fShort.toString());
       });
     });
 
@@ -270,7 +261,6 @@
     window.lastFreqList = allFreqs;
   }
 
-  // نسخ جميع الترددات
   function copyAllFreqs(){
     if (!window.lastFreqList || window.lastFreqList.length === 0) return;
 
@@ -289,12 +279,11 @@
     document.body.removeChild(temp);
   }
 
-  // فك الترددات إلى جملة مع نفس مفتاح المستخدم + عكس اختصار التردد
   function decodeFreqList(){
     const keyStr = document.getElementById("userKey").value || "0";
     const key = BigInt(keyStr);
 
-    const K = Number(document.getElementById("shortFactor").value) || 1;
+    const K = BigInt(document.getElementById("shortFactor").value || "1");
 
     const input = document.getElementById("freqListInput").value.trim();
     if (!input) {
@@ -309,14 +298,11 @@
       const t = line.trim();
       if (!t) return;
 
-      const f_short = Number(t);
-      if (isNaN(f_short)) return;
+      const fShort = BigInt(t);          // التردد المختصر
+      const fFull  = fShort * K;         // إعادة التوسيع
 
-      // إعادة التوسيع لعكس الاختصار
-      const f = f_short * K;
-
-      const C2 = BigInt(Math.round((f - f0) / df)); // الكود بعد التشفير
-      const C = C2 ^ key;                           // إزالة المفتاح
+      const C2 = (fFull - f0) / df;      // BigInt
+      const C  = C2 ^ key;               // BigInt
       const block = codeToWord(C);
       words.push(block);
     });
