@@ -221,9 +221,10 @@
     words.forEach(word => {
       const blocks = splitWord(word);
       blocks.forEach(block => {
-        const C = wordToCode(block);
-        const C2 = (C ^ key) / K;   // ← الاختصار هنا
-        const f = f0 + Number(C2) * df;
+        const C  = wordToCode(block);
+        const Cq = C / K;          // ← الاختصار أولًا
+        const C2 = Cq ^ key;       // ← ثم XOR
+        const f  = f0 + Number(C2) * df;
         allFreqs.push(f);
       });
     });
@@ -258,7 +259,8 @@
       if (isNaN(freq)) return;
 
       const C2 = BigInt(Math.round((freq - f0) / df));
-      const C = (C2 * K) ^ key;   // ← إعادة التوسيع
+      const Cq = C2 ^ key;        // ← إزالة XOR
+      const C  = Cq * K;          // ← إعادة التوسيع
       const block = codeToWord(C);
       words.push(block);
     });
