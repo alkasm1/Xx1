@@ -105,14 +105,14 @@
     <label>مفتاح المستخدم (رقم كبير مشترك بين المرسل والمستقبل):</label>
     <input id="userKey" type="number" value="123456789">
 
-    <label>معامل الاختصار (اختر قيمة آمنة):</label>
+    <label>معامل اختصار التردد (قوى 2 فقط — آمنة 100%):</label>
     <select id="shortFactor">
       <option value="1">بدون اختصار (1)</option>
-      <option value="32">32¹ = 32</option>
-      <option value="1024">32² = 1024</option>
-      <option value="32768">32³ = 32768</option>
-      <option value="1048576">32⁴ = 1,048,576</option>
-      <option value="33554432">32⁵ = 33,554,432</option>
+      <option value="32">32</option>
+      <option value="1024">1024</option>
+      <option value="32768">32768</option>
+      <option value="1048576">1048576</option>
+      <option value="33554432">33554432</option>
     </select>
 
     <div class="row">
@@ -137,7 +137,7 @@
     </div>
 
     <div class="footer">
-      م: رأفت عمر — نسخة مطوّرة بمعامل اختصار
+      م: رأفت عمر — نسخة اختصار التردد فقط
     </div>
   </div>
 
@@ -222,10 +222,12 @@
       const blocks = splitWord(word);
       blocks.forEach(block => {
         const C  = wordToCode(block);
-        const Cq = C / K;          // ← الاختصار أولًا
-        const C2 = Cq ^ key;       // ← ثم XOR
-        const f  = f0 + Number(C2) * df;
-        allFreqs.push(f);
+        const C2 = C ^ key;              // الكود المشفر
+        const f  = f0 + Number(C2);      // التردد الأصلي
+
+        const f_short = Math.floor(f / Number(K));   // ← اختصار التردد فقط
+
+        allFreqs.push(f_short);
       });
     });
 
@@ -255,12 +257,13 @@
     const words = [];
 
     lines.forEach(line => {
-      const freq = Number(line.trim());
-      if (isNaN(freq)) return;
+      const f_short = Number(line.trim());
+      if (isNaN(f_short)) return;
 
-      const C2 = BigInt(Math.round((freq - f0) / df));
-      const Cq = C2 ^ key;        // ← إزالة XOR
-      const C  = Cq * K;          // ← إعادة التوسيع
+      const f = f_short * Number(K);     // ← إعادة التوسيع
+      const C2 = BigInt(f - f0);         // الكود المشفر
+      const C  = C2 ^ key;               // إزالة XOR
+
       const block = codeToWord(C);
       words.push(block);
     });
