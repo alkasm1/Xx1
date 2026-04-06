@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<title>النظام الترددي اللغوي — QR</title>
+
+<style>
+body {
+  font-family: "Cairo", sans-serif;
+  background: #0d1117;
+  color: #e6edf3;
+  margin: 0;
+  padding: 0;
+}
+.container {
+  max-width: 900px;
+  margin: 40px auto;
+  background: #161b22;
+  border-radius: 14px;
+  padding: 28px;
+  border: 1px solid #30363d;
+}
+h1 { text-align: center; color: #58a6ff; }
+textarea, input {
+  width: 100%; padding: 10px; margin-top: 6px;
+  border-radius: 8px; border: 1px solid #30363d;
+  background: #0d1117; color: #e6edf3;
+}
+button {
+  margin-top: 12px; padding: 10px 18px;
+  border-radius: 8px; border: none;
+  background: #238636; color: white;
+  cursor: pointer;
+}
+button:hover { background: #2ea043; }
+.output {
+  margin-top: 10px; padding: 12px;
+  background: #0d1117; border: 1px dashed #30363d;
+  border-radius: 8px; white-space: pre-wrap;
+}
+#qrcode { margin-top: 20px; text-align: center; }
+</style>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+</head>
+<body>
+
+<div class="container">
+<h1>النظام الترددي اللغوي — تحويل إلى QR</h1>
+
+<label>مفتاح المستخدم:</label>
+<input id="userKey" type="number" value="123456789">
+
+<h2>1) الجملة → QR</h2>
+<textarea id="sentenceInput" placeholder="أدخل جملة عربية..."></textarea>
+<button onclick="encodeToQR()">تحويل إلى QR</button>
+
+<div id="qrcode"></div>
+
+<h2>2) QR → الجملة</h2>
+<label>الصق محتوى QR هنا:</label>
+<textarea id="qrInput" placeholder="الصق النص المستخرج من QR..."></textarea>
+<button onclick="decodeFromQR()">تحويل إلى جملة</button>
+
+<div class="output" id="decodeOutput">—</div>
+
+</div>
+
+<script>
+const B = 32;
+const LMAX = 12;
+const f0 = 100000n;
+const df = 1n;
+
+function normalizeArabic(s) {
+  return (s || "")
+    .replace(/[إأآ]/g, "ا")
+    .replace(/ى/g, "ي")
+    .replace(/ؤ/g, "و")
+    .replace(/ئ/g, "ي")
+    .replace(/ة/g, "ه");
+}
+
+const indexToChar = {
+  0:"",1:"ا",2:"ب",3:"ت",4:"ث",5:"ج",6:"ح",7:"خ",
+  8:"د",9:"ذ",10:"ر",11:"ز",12:"س",13:"ش",14:"ص",
+  15:"ض",16:"ط",17:"ظ",18:"ع",19:"غ",20:"ف",21:"ق",
+  22:"ك",23:"ل",24:"م",25:"ن",26:"ه",27:"و",28:"ي"
+};
+
+const charToIndex = {};
+for (const [i,ch] of Object.entries(indexToChar)) {
+  if (ch) charToIndex[ch] = parseInt(i, 10);
+}
+
+function splitWord(word) {
+  const blocks = [];
+  for (let i = 0; i < word.length; i += LMAX) {
+    blocks.push(word.slice(i, i + LMAX));
+  }
+  return blocks;
+}
+
+function wordToCode(word){
+  const c = new Array(LMAX).fill(0);
+  let pos = 0;
+  for (let i = word.length - 1; i >= 0; i--){
+    const idx = charToIndex[word[i]];
+    if (idx === undefined) throw new Error("حرف غير مدعوم: " + word[i]);
+    c[pos++] = idx;
+  }
+  let C = 0n;
+  for (let i = 0; i < LMAX; i++){
+    C += BigInt(c[i]) * (BigInt(B) ** BigInt(i));
+  }
+  return C;
+}
+
+function codeToWord(Cbig){
+  let C = BigInt(Cbig);
+  const digits = [];
+  for (let i = 0; i < LMAX; i++){
+    digits.push(Number(C % BigInt(B)));
+    C /= BigInt(B);
+  }
+  let w = "";
+  for (let i = LMAX - 1; i >= 0; i--){
+    w += indexToChar[digits[i]] || "";
+  }
+  return w;
+}
+
+function encodeToQR(){
+  const key = BigInt(document.getElementById("userKey").value || "0");
+  const sentence = normalizeArabic(document.getElementById("sentenceInput").value.trim());
+  if (!sentence) return;
+
+  const words = sentence.split(/\s+/);
+  const freqs = [];
+
+  words.forEach(word => {
+    const blocks = splitWord(word);
+    blocks.forEach(block => {
+      const C  = wordToCode(block);
+      const C2 = C ^ key;
+      const fFull = f0 + C2 * df;
+      freqs.push(fFull.toString());
+    });
+  });
+
+  const data = freqs.join("|");
+
+  document.getElementById("qrcode").innerHTML = "";
+  new QRCode(document.getElementById("qrcode"), {
+    text: data,
+    width: 256,
+    height: 256
+  });
+}
+
+function decodeFromQR(){
+  const key = BigInt(document.getElementById("userKey").value || "0");
+  const data = document.getElementById("qrInput").value.trim();
+  if (!data) return;
+
+  const freqs = data.split("|");
+  const words = [];
+
+  freqs.forEach(f => {
+    const fFull = BigInt(f);
+    const C2 = (fFull - f0) / df;
+    const C  = C2 ^ key;
+    const block = codeToWord(C);
+    words.push(block);
+  });
+
+  document.getElementById("decodeOutput").textContent = words.join(" ");
+}
+</script>
+
+</body>
+</html>
